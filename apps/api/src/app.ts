@@ -5,6 +5,7 @@ import cartRouter from './routes/cart';
 import ordersRouter from './routes/orders';
 import adminRouter from './routes/admin';
 import usersRouter from './routes/users';
+import paymentsRouter from './routes/payments';
 
 const app = express();
 
@@ -21,6 +22,7 @@ app.use('/api/cart', cartRouter);
 app.use('/api/orders', ordersRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/users', usersRouter);
+app.use('/api/payments', paymentsRouter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
