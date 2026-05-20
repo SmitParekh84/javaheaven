@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import menuRouter from './routes/menu';
+import cartRouter from './routes/cart';
+import ordersRouter from './routes/orders';
 
 const app = express();
 
@@ -13,6 +15,8 @@ app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 
 app.use('/api/menu', menuRouter);
+app.use('/api/cart', cartRouter);
+app.use('/api/orders', ordersRouter);
 
 app.get('/health', (_req, res) => res.json({ status: 'ok' }));
 
