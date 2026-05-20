@@ -1,0 +1,12 @@
+/* custom-slick.css */
+
+  
+  .slick-prev:before, .slick-next:before {
+    font-size: 1.5rem;
+    color: #664030; /* This should match your custom color */
+  }
+  
+  .slick-prev:hover:before, .slick-next:hover:before {
+    color: #503225; /* You can set a darker or hover color if needed */
+  }
+  
