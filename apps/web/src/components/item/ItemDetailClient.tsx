@@ -63,7 +63,6 @@ export default function ItemDetailClient({
     try {
       addToCart({
         id: item._id,
-        _id: item._id,
         name: item.name,
         price: calcPrice(selectedSize),
         quantity: 1,

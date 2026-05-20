@@ -74,7 +74,7 @@ export default function CartPage() {
         body: JSON.stringify({
           userId: username,
           cartItems: cartItems.map(i => ({
-            id: i._id ?? i.id,
+            id: i.id,
             name: i.name,
             price: i.price,
             quantity: i.quantity,

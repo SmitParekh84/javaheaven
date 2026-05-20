@@ -1,14 +1,16 @@
 'use client';
 
-import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
+import {
+  createContext, useContext, useEffect, useRef, useState, useCallback,
+} from 'react';
+import { createClient } from '@/lib/supabase';
 
 export interface CartItem {
-  id:       string;
-  _id?:     string;
-  name:     string;
-  price:    number;
-  quantity: number;
-  size:     string;
+  id:        string;
+  name:      string;
+  price:     number;
+  quantity:  number;
+  size:      string;
   imageUrl?: string;
 }
 
@@ -31,14 +33,6 @@ export const useCart = () => {
 };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
-
-function parseJwt(token: string) {
-  try {
-    return JSON.parse(atob(token.split('.')[1]));
-  } catch {
-    return null;
-  }
-}
 
 function encodeCart(items: CartItem[]) {
   return btoa(JSON.stringify({ cartItems: items }));
@@ -64,36 +58,67 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setCartItemsState(items);
   }, []);
 
-  // Sync to localStorage + server on change (skip initial mount)
+  // Persist to localStorage + sync to Express backend on every cart change
   useEffect(() => {
     localStorage.setItem('carttoken', encodeCart(cartItems));
     if (!isMounted.current) { isMounted.current = true; return; }
 
-    const storedUser = localStorage.getItem('user');
-    const user = storedUser ? parseJwt(storedUser) : null;
-    if (!user?.userId) return;
-
-    fetch(`${API_URL}/api/users/cart`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: user.userId, cartItems }),
-    }).catch(() => {});
+    const supabase = createClient();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) return;
+      fetch(`${API_URL}/api/cart`, {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          Authorization:   `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          tenantId: 'default',
+          items: cartItems.map((i) => ({
+            menuItemId: i.id,
+            name:       i.name,
+            price:      i.price,
+            qty:        i.quantity,
+            size:       i.size,
+            imageUrl:   i.imageUrl,
+          })),
+        }),
+      }).catch(() => {});
+    });
   }, [cartItems]);
 
-  // Hydrate cart from server on mount (when logged in)
+  // Hydrate cart from Express backend when user is logged in
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    const user = storedUser ? parseJwt(storedUser) : null;
-    if (!user?._id) return;
-    fetch(`${API_URL}/api/users/cart/${user._id}`)
-      .then(r => r.json())
-      .then(data => { if (data?.cart) setCartItemsState(data.cart); })
-      .catch(() => {});
+    const supabase = createClient();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) return;
+      fetch(`${API_URL}/api/cart`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (Array.isArray(data?.items) && data.items.length > 0) {
+            setCartItemsState(
+              data.items.map((i: {
+                menuItemId: string; name: string; price: number; qty: number; size: string; imageUrl?: string;
+              }) => ({
+                id:       i.menuItemId,
+                name:     i.name,
+                price:    i.price,
+                quantity: i.qty,
+                size:     i.size,
+                imageUrl: i.imageUrl,
+              }))
+            );
+          }
+        })
+        .catch(() => {});
+    });
   }, []);
 
   const addToCart = useCallback((newItem: CartItem) => {
-    setCartItemsState(prev => {
-      const idx = prev.findIndex(i => i.id === newItem.id && i.size === newItem.size);
+    setCartItemsState((prev) => {
+      const idx = prev.findIndex((i) => i.id === newItem.id && i.size === newItem.size);
       if (idx >= 0) {
         const updated = [...prev];
         updated[idx] = { ...updated[idx], quantity: updated[idx].quantity + (newItem.quantity || 1) };
@@ -104,12 +129,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const removeFromCart = useCallback((id: string, size: string) => {
-    setCartItemsState(prev => prev.filter(i => !(i.id === id && i.size === size)));
+    setCartItemsState((prev) => prev.filter((i) => !(i.id === id && i.size === size)));
   }, []);
 
   const updateCartItemQuantity = useCallback((id: string, size: string, qty: number) => {
-    setCartItemsState(prev =>
-      prev.map(i => i.id === id && i.size === size ? { ...i, quantity: Math.max(qty, 1) } : i)
+    setCartItemsState((prev) =>
+      prev.map((i) => i.id === id && i.size === size ? { ...i, quantity: Math.max(qty, 1) } : i)
     );
   }, []);
 
