@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
@@ -9,12 +9,10 @@ import {
   faArrowRight, faEnvelope, faSignOutAlt, faUser,
   faBars, faXmark, faShoppingCart, faShoppingBasket,
 } from '@fortawesome/free-solid-svg-icons';
-import axios from 'axios';
 import toast from 'react-hot-toast';
 import { useCart } from './providers/CartContext';
+import { useUser } from './providers/UserContext';
 import { Tenant } from '@/types/tenant';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
 const ADMIN_NAV = [
   { name: 'Dashboard',       href: '/admin/dashboard' },
@@ -26,29 +24,26 @@ const ADMIN_NAV = [
   { name: 'Best Selling',    href: '/admin/best-selling' },
 ];
 
-function parseJwt(token: string) {
-  try { return JSON.parse(atob(token.split('.')[1])); } catch { return null; }
-}
-
 interface ProfileMenuProps {
-  user: Record<string, string>;
-  loading: boolean;
+  username: string;
+  email:    string;
+  loading:  boolean;
   onLogout: () => void;
-  onClose: () => void;
+  onClose:  () => void;
 }
 
-function ProfileMenu({ user, loading, onLogout, onClose }: ProfileMenuProps) {
+function ProfileMenu({ username, email, loading, onLogout, onClose }: ProfileMenuProps) {
   return (
     <div className="absolute right-0 mt-2 w-56 bg-brand-card border border-brand-muted rounded-lg shadow-xl z-[100]">
       <div className="px-4 py-3 flex items-center text-brand-text">
         <FontAwesomeIcon icon={faUser} className="mr-2 text-brand-muted" />
         <Link href="/profile" className="hover:text-brand-secondary font-semibold truncate" onClick={onClose}>
-          {user.username ?? 'Guest'}
+          {username}
         </Link>
       </div>
       <div className="px-4 py-2 flex items-center text-sm text-brand-muted">
         <FontAwesomeIcon icon={faEnvelope} className="mr-2" />
-        <span className="truncate">{user.email ?? ''}</span>
+        <span className="truncate">{email}</span>
       </div>
       <div className="border-t border-brand-muted/30" />
       <button
@@ -66,22 +61,14 @@ function ProfileMenu({ user, loading, onLogout, onClose }: ProfileMenuProps) {
 export default function Navbar({ tenant }: { tenant: Tenant }) {
   const router = useRouter();
   const { totalItems } = useCart();
+  const { user, signOut } = useUser();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [loggedInUser, setLoggedInUser] = useState<Record<string, string> | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const stored = localStorage.getItem('user');
-    if (!stored) return;
-    const decoded = parseJwt(stored);
-    if (decoded) {
-      setLoggedInUser(decoded);
-      setIsAdmin(decoded.role === 'admin');
-    }
-  }, []);
+  const isAdmin = user?.app_metadata?.role === 'admin';
+  const username = (user?.user_metadata?.name as string) ?? user?.email ?? 'Guest';
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -96,16 +83,11 @@ export default function Navbar({ tenant }: { tenant: Tenant }) {
   const handleLogout = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const decoded = token ? parseJwt(token) : null;
-      await axios.post(`${API_URL}/api/logout`, { userId: decoded?.userId }, { withCredentials: true });
-      sessionStorage.clear();
-      localStorage.clear();
-      setLoggedInUser(null);
-      setIsAdmin(false);
+      await signOut();
       setMobileOpen(false);
       setShowProfileMenu(false);
       router.push('/');
+      router.refresh();
       toast.success('Logged out successfully');
     } catch {
       toast.error('Failed to logout. Please try again.');
@@ -128,7 +110,7 @@ export default function Navbar({ tenant }: { tenant: Tenant }) {
 
         {/* Desktop nav links */}
         <div className="hidden lg:flex lg:gap-x-10">
-          {(!loggedInUser || !isAdmin) && (
+          {(!user || !isAdmin) && (
             <>
               <Link href="/" className={navLinkClass}>Home</Link>
               <Link href="/about" className={navLinkClass}>About</Link>
@@ -136,7 +118,7 @@ export default function Navbar({ tenant }: { tenant: Tenant }) {
               <Link href="/menu" className={navLinkClass}>Menu</Link>
             </>
           )}
-          {loggedInUser && !isAdmin && (
+          {user && !isAdmin && (
             <>
               <Link href="/my-orders" className={navLinkClass}>My Orders</Link>
               <Link href="/cart" className={`${navLinkClass} flex items-center gap-1`}>
@@ -145,14 +127,14 @@ export default function Navbar({ tenant }: { tenant: Tenant }) {
               </Link>
             </>
           )}
-          {loggedInUser && isAdmin && ADMIN_NAV.map(item => (
+          {user && isAdmin && ADMIN_NAV.map(item => (
             <Link key={item.href} href={item.href} className={navLinkClass}>{item.name}</Link>
           ))}
         </div>
 
         {/* Desktop right */}
         <div className="hidden lg:flex lg:flex-1 lg:justify-end">
-          {loggedInUser ? (
+          {user ? (
             <div className="relative" ref={menuRef}>
               <button
                 onClick={() => setShowProfileMenu(v => !v)}
@@ -161,11 +143,12 @@ export default function Navbar({ tenant }: { tenant: Tenant }) {
                 aria-expanded={showProfileMenu}
               >
                 <FontAwesomeIcon icon={faUser} />
-                <span className="truncate max-w-[120px]">{loggedInUser.username ?? 'Guest'}</span>
+                <span className="truncate max-w-[120px]">{username}</span>
               </button>
               {showProfileMenu && (
                 <ProfileMenu
-                  user={loggedInUser}
+                  username={username}
+                  email={user.email ?? ''}
                   loading={loading}
                   onLogout={handleLogout}
                   onClose={() => setShowProfileMenu(false)}
@@ -182,7 +165,7 @@ export default function Navbar({ tenant }: { tenant: Tenant }) {
 
         {/* Mobile bar */}
         <div className="flex items-center gap-3 lg:hidden">
-          {loggedInUser && !isAdmin && (
+          {user && !isAdmin && (
             <Link href="/cart" className="relative text-brand-text hover:text-brand-secondary">
               <FontAwesomeIcon icon={faShoppingBasket} className="text-2xl" />
               {totalItems > 0 && (
@@ -192,7 +175,7 @@ export default function Navbar({ tenant }: { tenant: Tenant }) {
               )}
             </Link>
           )}
-          {!loggedInUser && (
+          {!user && (
             <Link href="/login" className="text-sm bg-brand-secondary rounded-full py-1.5 px-5 font-semibold text-brand-btn-text">
               Log in
             </Link>
@@ -219,7 +202,7 @@ export default function Navbar({ tenant }: { tenant: Tenant }) {
             </div>
 
             <div className="space-y-1">
-              {(!loggedInUser || !isAdmin) && (
+              {(!user || !isAdmin) && (
                 <>
                   <Link href="/" onClick={() => setMobileOpen(false)} className={mobileLinkClass}>Home</Link>
                   <Link href="/menu" onClick={() => setMobileOpen(false)} className={mobileLinkClass}>Menu</Link>
@@ -227,12 +210,12 @@ export default function Navbar({ tenant }: { tenant: Tenant }) {
                   <Link href="/about" onClick={() => setMobileOpen(false)} className={mobileLinkClass}>About</Link>
                 </>
               )}
-              {loggedInUser && isAdmin && ADMIN_NAV.map(item => (
+              {user && isAdmin && ADMIN_NAV.map(item => (
                 <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)} className={mobileLinkClass}>
                   {item.name}
                 </Link>
               ))}
-              {loggedInUser && !isAdmin && (
+              {user && !isAdmin && (
                 <>
                   <Link href="/my-orders" onClick={() => setMobileOpen(false)} className={mobileLinkClass}>My Orders</Link>
                   <Link href="/cart" onClick={() => setMobileOpen(false)} className={mobileLinkClass}>
@@ -244,7 +227,7 @@ export default function Navbar({ tenant }: { tenant: Tenant }) {
             </div>
 
             <div className="mt-6 pt-6 border-t border-brand-muted/30">
-              {loggedInUser ? (
+              {user ? (
                 <button
                   onClick={handleLogout}
                   className="block w-full text-center py-2 px-4 rounded-lg text-danger font-semibold hover:bg-brand-accent transition-colors"
