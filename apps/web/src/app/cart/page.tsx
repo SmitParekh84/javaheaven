@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -17,13 +17,6 @@ export default function CartPage() {
   const [address, setAddress] = useState('');
   const [deliveryOption, setDeliveryOption] = useState<'hand' | 'home'>('hand');
   const [loading, setLoading] = useState(false);
-  const [authed, setAuthed] = useState(false);
-
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) { router.push('/login'); return; }
-    setAuthed(true);
-  }, [router]);
 
   const total = cartItems.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
@@ -35,62 +28,28 @@ export default function CartPage() {
 
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user) { router.push('/login'); return; }
 
-    const username = (user as any)?.username;
-    if (!username) {
-      toast.error('Please log in to place an order.');
-      router.push('/login');
-      return;
-    }
-    if (deliveryOption === 'home' && !address.trim()) {
-      toast.error('Address is required for home delivery.');
-      return;
-    }
+    const { createClient } = await import('@/lib/supabase');
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { router.push('/login'); return; }
 
     setLoading(true);
     try {
-      const cartPayload = cartItems.map(i => ({
-        productId: i.id,
-        name: i.name,
-        price: i.price,
-        quantity: i.quantity,
-        size: i.size,
-      }));
-
-      const stockRes = await fetch(`${API_URL}/api/stock/check-stock`, {
+      const res = await fetch(`${API_URL}/api/payments/create-checkout`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cartItems: cartPayload }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization:  `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ tenantId: 'default' }),
       });
-      const stockData = await stockRes.json();
-      if (!stockData.success) {
-        toast.error(stockData.message || 'Insufficient stock for one or more items.');
-        return;
-      }
-
-      const sessionRes = await fetch(`${API_URL}/api/create-checkout-session`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: username,
-          cartItems: cartItems.map(i => ({
-            id: i.id,
-            name: i.name,
-            price: i.price,
-            quantity: i.quantity,
-            size: i.size,
-          })),
-          deliveryOption,
-          address: deliveryOption === 'hand' ? '' : address,
-          successUrl: `${window.location.origin}/order-success`,
-          cancelUrl: `${window.location.origin}/cart`,
-        }),
-      });
-      const sessionData = await sessionRes.json();
-      if (sessionData.url) {
-        window.location.href = sessionData.url;
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
       } else {
-        toast.error('Failed to initiate checkout.');
+        toast.error(data.error ?? 'Failed to start checkout');
       }
     } catch {
       toast.error('Checkout failed. Please try again.');
@@ -98,8 +57,6 @@ export default function CartPage() {
       setLoading(false);
     }
   };
-
-  if (!authed) return null;
 
   if (loading) {
     return (
