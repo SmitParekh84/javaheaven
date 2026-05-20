@@ -41,7 +41,7 @@ describe('requireAuth middleware', () => {
   it('attaches req.user and calls next on valid token', async () => {
     (supabaseAdmin.auth.getUser as jest.Mock).mockResolvedValue({
       data: {
-        user: { id: 'uid-1', email: 'a@b.com', user_metadata: { role: 'user' } },
+        user: { id: 'uid-1', email: 'a@b.com', app_metadata: { role: 'user' } },
       },
       error: null,
     });
