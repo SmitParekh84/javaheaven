@@ -5,8 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { EyeIcon, EyeSlashIcon } from '@heroicons/react/24/solid';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
+import { createClient } from '@/lib/supabase';
 
 const COUNTRY_CODES = [
   { name: 'India', code: '+91' },
@@ -83,28 +82,30 @@ export default function SignUpPage() {
     e.preventDefault();
     if (!validate()) return;
 
-    const mobile = `${form.countryCode}-${form.mobno.replace(/-/g, '')}`;
     setLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/api/signup`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, mobno: mobile }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        toast.success('Account created! Please log in.');
-        router.push('/login');
-      } else if (res.status === 409) {
-        toast.error('An account with this email or mobile already exists.');
-      } else {
-        toast.error(data.message || 'Registration failed.');
-      }
-    } catch {
-      toast.error('Registration failed. Please try again.');
-    } finally {
-      setLoading(false);
+    const supabase = createClient();
+    const mobile   = `${form.countryCode}-${form.mobno.replace(/-/g, '')}`;
+
+    const { error } = await supabase.auth.signUp({
+      email:    form.email,
+      password: form.password,
+      options: {
+        data: {
+          name:  form.username,
+          phone: mobile,
+        },
+      },
+    });
+
+    setLoading(false);
+
+    if (error) {
+      toast.error(error.message);
+      return;
     }
+
+    toast.success('Account created! Check your email to confirm your address.');
+    router.push('/login');
   };
 
   const inputClass =
