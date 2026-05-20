@@ -33,7 +33,9 @@
     "react-slick": "^0.30.2",
     "react-spinners": "^0.14.1",
     "slick-carousel": "^1.8.1",
-    "swiper": "^11.1.14"
+    "swiper": "^11.1.14",
+    "@supabase/supabase-js": "^2.49.4",
+    "@supabase/ssr": "^0.6.1"
   },
   "devDependencies": {
     "@netlify/plugin-nextjs": "^5.15.11",
