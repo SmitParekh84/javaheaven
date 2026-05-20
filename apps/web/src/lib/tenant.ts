@@ -1,17 +1,15 @@
 import { cache } from 'react';
 import { DEFAULT_TENANT, Tenant, TenantCSSVars } from '@/types/tenant';
+import { connectDB } from './db';
+import TenantModel from '@/models/Tenant';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
-
-/** Fetch tenant config by domain. Uses React's cache() so one request per render tree. */
+/** Fetch tenant config by domain. Queries MongoDB directly (server-only). */
 export const getTenantByDomain = cache(async (domain: string): Promise<Tenant> => {
   try {
-    const res = await fetch(`${API_URL}/api/tenant?domain=${encodeURIComponent(domain)}`, {
-      next: { revalidate: 300 }, // cache for 5 minutes
-    });
-    if (!res.ok) return DEFAULT_TENANT;
-    const data = await res.json();
-    return data as Tenant;
+    await connectDB();
+    const tenant = await TenantModel.findOne({ domain }).lean();
+    if (!tenant) return DEFAULT_TENANT;
+    return tenant as unknown as Tenant;
   } catch {
     return DEFAULT_TENANT;
   }
@@ -20,11 +18,10 @@ export const getTenantByDomain = cache(async (domain: string): Promise<Tenant> =
 /** Fetch tenant config by tenantId slug. */
 export const getTenantById = cache(async (tenantId: string): Promise<Tenant> => {
   try {
-    const res = await fetch(`${API_URL}/api/tenant?id=${encodeURIComponent(tenantId)}`, {
-      next: { revalidate: 300 },
-    });
-    if (!res.ok) return DEFAULT_TENANT;
-    return (await res.json()) as Tenant;
+    await connectDB();
+    const tenant = await TenantModel.findOne({ tenantId }).lean();
+    if (!tenant) return DEFAULT_TENANT;
+    return tenant as unknown as Tenant;
   } catch {
     return DEFAULT_TENANT;
   }

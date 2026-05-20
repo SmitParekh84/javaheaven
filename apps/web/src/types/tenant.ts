@@ -71,7 +71,7 @@ export const DEFAULT_TENANT: Omit<Tenant, 'createdAt' | 'updatedAt'> & { created
     mutedColor:     '#D3D3D3',
     bgColor:        '#F5F5DC',
     cardColor:      '#FFFFFF',
-    btnTextColor:   '#503225',
+    btnTextColor:   '#F5F5DC',
     fontFamily:     'League Spartan',
   },
   assets: {

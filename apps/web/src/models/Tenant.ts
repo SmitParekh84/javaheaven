@@ -49,7 +49,7 @@ const TenantSchema = new Schema<ITenant>(
       mutedColor:     { type: String, default: '#D3D3D3' },
       bgColor:        { type: String, default: '#F5F5DC' },
       cardColor:      { type: String, default: '#FFFFFF' },
-      btnTextColor:   { type: String, default: '#503225' },
+      btnTextColor:   { type: String, default: '#F5F5DC' },
       fontFamily:     { type: String, default: 'League Spartan' },
     },
     assets: {
